@@ -1,0 +1,310 @@
+---
+title: "Diabetes Logistic Regression"
+author:"Yundi Qiu"
+output: html_document
+date: "2022-11-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Cleaning the Global Environment
+```{r}
+rm(list=ls(all=T))
+```
+
+
+Import necessary Packages and read data
+```{r}
+library(tidyverse)
+library(patchwork)
+library(caret)
+library(cowplot)
+library(readr)
+library(neuralnet)
+library(gains)
+
+diabetes <- read_csv("diabetes.csv")
+summary(diabetes)
+```
+
+
+Set up training and validation data
+```{r}
+set.seed(1234)  
+train.index <- sample(c(1:dim(diabetes)[1]), dim(diabetes)[1]*0.6)
+train <- diabetes[train.index, ]
+valid <- diabetes[-train.index, ]
+summary(train)
+```
+
+
+Normalization 1
+method = c("scale","center")
+```{r}
+preprocVal <- preProcess(train[,-c(9)], method = c("scale","center"))
+trainTran <- predict(preprocVal, train)
+validTran <- predict(preprocVal, valid)
+```
+
+
+Logistic Regression Model 1
+```{r}
+logit.diabetes <- glm(Outcome ~ ., data = trainTran, family="binomial")
+summary(logit.diabetes)
+```
+
+
+Performance Analysis:
+Confusion Matrix for Logistic Regression Model 1
+```{r}
+valid$predict <- predict(logit.diabetes, validTran, type="response")
+train$predict <- predict(logit.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+``` 
+
+
+
+Lift Chart for Logistic Regression Model 1
+```{r}
+logit.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+logit.diabetes.gain
+
+# plot lift chart
+plot(c(0, logit.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, logit.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) # length of the validation set
+y_baseline <- c(0, sum(validTran$Outcome)) # The total number of Class 1 (actual) in the validation set
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- logit.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = logit.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+
+Logistic Regression Model 2
+```{r}
+logit.diabetes <- glm(Outcome ~ Pregnancies + Glucose + BMI + DiabetesPedigreeFunction, data = trainTran)
+summary(logit.diabetes)
+```
+
+Performance Analysis:
+Confusion Matrix for Logistic Regression Model 2
+```{r}
+valid$predict <- predict(logit.diabetes, validTran, type="response")
+train$predict <- predict(logit.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+``` 
+
+
+
+Lift Chart for Logistic Regression Model 2
+```{r}
+logit.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+logit.diabetes.gain
+
+# plot lift chart
+plot(c(0, logit.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, logit.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) # length of the validation set
+y_baseline <- c(0, sum(validTran$Outcome)) # The total number of Class 1 (actual) in the validation set
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- logit.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = logit.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+Normalization 2
+method = "range"
+```{r}
+preprocVal <- preProcess(train[,-c(9)], method = "range")
+trainTran <- predict(preprocVal, train)
+validTran <- predict(preprocVal, valid)
+```
+
+
+Logistic Regression Model 3
+```{r}
+logit.diabetes <- glm(Outcome ~ ., data = trainTran, family="binomial")
+summary(logit.diabetes)
+```
+
+
+Performance Analysis:
+Confusion Matrix for Logistic Regression Model 3
+```{r}
+valid$predict <- predict(logit.diabetes, validTran, type="response")
+train$predict <- predict(logit.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+``` 
+
+
+
+Lift Chart for Logistic Regression Model 3
+```{r}
+logit.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+logit.diabetes.gain
+
+# plot lift chart
+plot(c(0, logit.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, logit.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) # length of the validation set
+y_baseline <- c(0, sum(validTran$Outcome)) # The total number of Class 1 (actual) in the validation set
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- logit.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = logit.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+
+Logistic Regression Model 4
+```{r}
+logit.diabetes <- glm(Outcome ~ Pregnancies + Glucose + BMI + DiabetesPedigreeFunction, data = trainTran)
+summary(logit.diabetes)
+```
+
+
+Performance Analysis:
+Confusion Matrix for Logistic Regression Model 4
+```{r}
+valid$predict <- predict(logit.diabetes, validTran, type="response")
+train$predict <- predict(logit.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+``` 
+
+
+
+Lift Chart for Logistic Regression Model 4
+```{r}
+logit.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+logit.diabetes.gain
+
+# plot lift chart
+plot(c(0, logit.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, logit.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) # length of the validation set
+y_baseline <- c(0, sum(validTran$Outcome)) # The total number of Class 1 (actual) in the validation set
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- logit.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = logit.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+
+Normalization 3
+method = "pca"
+```{r}
+preprocVal <- preProcess(train[,-c(9)], method = "pca")
+trainTran <- predict(preprocVal, train)
+validTran <- predict(preprocVal, valid)
+```
+
+
+Logistic Regression Model 5
+```{r}
+logit.diabetes <- glm(Outcome ~ PC1 + PC2 + PC3 + PC5 + PC6, data = trainTran)
+summary(logit.diabetes)
+```
+
+
+Performance Analysis:
+Confusion Matrix for Logistic Regression Model 5
+```{r}
+valid$predict <- predict(logit.diabetes, validTran, type="response")
+train$predict <- predict(logit.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+```
+
+
+
+Lift Chart for Logistic Regression Model 5
+```{r}
+logit.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+logit.diabetes.gain
+
+# plot lift chart
+plot(c(0, logit.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, logit.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) # length of the validation set
+y_baseline <- c(0, sum(validTran$Outcome)) # The total number of Class 1 (actual) in the validation set
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- logit.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = logit.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```

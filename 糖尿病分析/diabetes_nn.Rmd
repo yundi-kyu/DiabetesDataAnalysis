@@ -1,0 +1,397 @@
+---
+title: "Diabetes, Neural Network"
+author:"Yundi Qiu"
+output: html_document
+date: "2022-11-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Cleaning the Global Environment
+```{r}
+rm(list=ls(all=T))
+```
+
+
+Import necessary Packages and read data
+```{r}
+library(tidyverse)
+library(patchwork)
+library(caret)
+library(cowplot)
+library(readr)
+library(neuralnet)
+library(gains)
+
+diabetes <- read_csv("diabetes.csv")
+summary(diabetes)
+```
+
+
+Set up training and validation data
+```{r}
+set.seed(1234)  
+train.index <- sample(c(1:dim(diabetes)[1]), dim(diabetes)[1]*0.6)
+train <- diabetes[train.index, ]
+valid <- diabetes[-train.index, ]
+```
+
+
+
+Normalization
+method = c("scale","center")
+```{r}
+preprocVal <- preProcess(train[,-c(9)], method = c("center","scale"))
+trainTran <- predict(preprocVal, train)
+validTran <- predict(preprocVal, valid)
+summary(trainTran)
+```
+
+
+Neural Network Model 1
+hidden layers = 2, node = c(4, 2)
+```{r}
+nn.diabetes <- neuralnet(Outcome ~ 
+                  Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+                 + BMI + DiabetesPedigreeFunction + Age, data = trainTran, 
+                 hidden = c(4, 2))
+
+nn.diabetes$result.matrix
+plot(nn.diabetes)
+```
+
+
+Performance Analysis
+Confusion Matrix for Neural Network Model 1
+```{r}
+valid$predict <- predict(nn.diabetes, validTran, type="response")
+train$predict <- predict(nn.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+```
+
+
+Lift Chart for Neural Network Model 1
+```{r}
+nn.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+nn.diabetes.gain
+
+# plot lift chart
+plot(c(0, nn.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, nn.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) 
+y_baseline <- c(0, sum(validTran$Outcome)) 
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- nn.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = nn.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+
+Neural Network Model 2
+hidden layers = 3, node = c(6, 4, 2)
+```{r}
+nn.diabetes <- neuralnet(Outcome ~ 
+                  Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+                 + BMI + DiabetesPedigreeFunction + Age, data = trainTran, 
+                 threshold = 0.1, stepmax = 1e+08, hidden = c(6, 4, 2))
+
+nn.diabetes$result.matrix
+plot(nn.diabetes)
+```
+
+
+Performance Analysis
+Confusion Matrix for Neural Network Model 2
+```{r}
+valid$predict <- predict(nn.diabetes, validTran, type="response")
+train$predict <- predict(nn.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+```
+
+
+
+Lift Chart for Neural Network Model 2
+```{r}
+nn.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+nn.diabetes.gain
+
+# plot lift chart
+plot(c(0, nn.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, nn.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) 
+y_baseline <- c(0, sum(validTran$Outcome)) 
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- nn.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = nn.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+
+Neural Network Model 3
+hidden layers = 2, node = c(5, 2)
+```{r}
+nn.diabetes <- neuralnet(Outcome ~ 
+                  Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+                 + BMI + DiabetesPedigreeFunction + Age, data = trainTran, 
+                hidden = c(5, 2))
+
+nn.diabetes$result.matrix
+plot(nn.diabetes)
+```
+
+
+Performance Analysis
+Confusion Matrix for Neural Network Model 3
+```{r}
+valid$predict <- predict(nn.diabetes, validTran, type="response")
+train$predict <- predict(nn.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+```
+
+
+
+Lift Chart for Neural Network Model 3
+```{r}
+nn.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+nn.diabetes.gain
+
+# plot lift chart
+plot(c(0, nn.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, nn.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) 
+y_baseline <- c(0, sum(validTran$Outcome)) 
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- nn.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = nn.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+
+Neural Network Model 5
+(named model 5 because it is analyzed after applying "range" method in the project report)
+hidden layers = 1, node = 1
+```{r}
+nn.diabetes <- neuralnet(Outcome ~ 
+                  Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+                 + BMI + DiabetesPedigreeFunction + Age, data = trainTran, 
+                 hidden = 1)
+
+nn.diabetes$result.matrix
+plot(nn.diabetes)
+```
+
+
+Performance Analysis
+Confusion Matrix for Neural Network Model 5
+```{r}
+valid$predict <- predict(nn.diabetes, validTran, type="response")
+train$predict <- predict(nn.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+```
+
+
+
+Lift Chart for Neural Network Model 5
+```{r}
+nn.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+nn.diabetes.gain
+
+# plot lift chart
+plot(c(0, nn.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, nn.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) 
+y_baseline <- c(0, sum(validTran$Outcome)) 
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- nn.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = nn.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+
+
+Neural Network Model 6
+(named model 6 because it is analyzed after the team tried 1 hidden layer, 1 node with "scale" and "center" normalization method)
+hidden layers = 2, node = c(1, 1)
+```{r}
+nn.diabetes <- neuralnet(Outcome ~ 
+                  Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+                 + BMI + DiabetesPedigreeFunction + Age, data = trainTran, 
+                 hidden = c(1, 1))
+
+nn.diabetes$result.matrix
+plot(nn.diabetes)
+```
+
+
+Performance Analysis
+Confusion Matrix for Neural Network Model 6
+```{r}
+valid$predict <- predict(nn.diabetes, validTran, type="response")
+train$predict <- predict(nn.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+```
+
+
+
+Lift Chart for Neural Network Model 6
+```{r}
+nn.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+nn.diabetes.gain
+
+# plot lift chart
+plot(c(0, nn.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, nn.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) 
+y_baseline <- c(0, sum(validTran$Outcome)) 
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- nn.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = nn.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+
+Normalization 2
+method = "range"
+```{r}
+preprocVal <- preProcess(train[,-c(9)], method = "range")
+trainTran <- predict(preprocVal, train)
+validTran <- predict(preprocVal, valid)
+summary(trainTran)
+```
+
+
+
+Neural Network Model 4
+hidden layers = 2, node = c(6, 4, 2)
+```{r}
+nn.diabetes <- neuralnet(Outcome ~ 
+                  Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+                 + BMI + DiabetesPedigreeFunction + Age, data = trainTran, 
+                 threshold = 0.1, stepmax = 1e+08, hidden = c(5, 2))
+
+nn.diabetes$result.matrix
+plot(nn.diabetes)
+```
+
+
+Performance Analysis
+Confusion Matrix for Neural Network Model 4
+```{r}
+valid$predict <- predict(nn.diabetes, validTran, type="response")
+train$predict <- predict(nn.diabetes, trainTran, type="response")
+
+ggplot(train, aes(predict, color=as.factor(Outcome))) + 
+  geom_density(size=1) + 
+  ggtitle("Training Set's Predicted Score") 
+
+cmatrix <- confusionMatrix(as.factor(ifelse(validTran$Outcome > 0.5, 1, 0)), 
+                           as.factor(ifelse(valid$predict > 0.5, 1, 0)))
+cmatrix
+```
+
+
+
+Lift Chart for Neural Network Model 4
+```{r}
+nn.diabetes.gain <- gains(validTran$Outcome, valid$predict)
+nn.diabetes.gain
+
+# plot lift chart
+plot(c(0, nn.diabetes.gain$cume.pct.of.total*sum(validTran$Outcome)) ~ 
+       c(0, nn.diabetes.gain$cume.obs), 
+     xlab="# cases", ylab="Cumulative", type="l",xaxp = c(0, 2000, 10))
+
+# Add baseline model:
+x_baseline <- c(0, dim(validTran)[1]) 
+y_baseline <- c(0, sum(validTran$Outcome)) 
+lines(x_baseline, y_baseline, lty=2)
+
+#compute deciles and plot decile-wise chart
+heights <- nn.diabetes.gain$mean.resp/mean(validTran$Outcome)
+midpoints <- barplot(heights, names.arg = nn.diabetes.gain$depth, ylim = c(0,9), 
+                     xlab = "Percentile", ylab = "Mean Response", main = "Decile-wise lift chart")
+# add labels to columns
+text(midpoints, heights+0.5, labels=round(heights, 1), cex = 0.8)
+```
+
+
+
+
